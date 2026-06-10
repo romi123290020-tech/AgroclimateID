@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Digital Monitoring Card Agroklimatologi</title>
+<meta name="description" content="Monitoring Iklim, ENSO, GDD dan Serangan OPT Perkebunan Indonesia" />
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: ['class', '[data-theme="dark"]'],
+    theme: {
+      extend: {
+        colors: {
+          agro: { 50:'#eefbf3', 100:'#d6f5e1', 200:'#a8eac2', 300:'#73da9d', 400:'#3fc578', 500:'#1faa5c', 600:'#138848', 700:'#0f6b3a', 800:'#0d5530', 900:'#0a4427' },
+          climate: { 50:'#eef7ff', 100:'#d8ecff', 200:'#b5dcff', 300:'#84c4ff', 400:'#4fa3ff', 500:'#2480f7', 600:'#1264db', 700:'#114fae', 800:'#13438a', 900:'#143a70' }
+        },
+        fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] }
+      }
+    }
+  }
+</script>
+
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+<!-- DataTables -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.dataTables.min.css" />
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+
+<!-- Parsing & Export -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<!-- Lucide icons -->
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<link rel="stylesheet" href="style.css" />
+</head>
+<body class="font-sans antialiased text-slate-800 dark:text-slate-100 transition-colors duration-300">
+
+<!-- Animated gradient backdrop -->
+<div class="fixed inset-0 -z-10 bg-gradient" aria-hidden="true"></div>
+<div class="fixed inset-0 -z-10 bg-grid opacity-40" aria-hidden="true"></div>
+
+<!-- NAV -->
+<header class="sticky top-0 z-40 backdrop-blur-xl bg-white/60 dark:bg-slate-900/60 border-b border-white/30 dark:border-slate-700/40">
+  <div class="max-w-[1500px] mx-auto px-4 lg:px-8 h-16 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-agro-500 to-climate-500 flex items-center justify-center shadow-lg shadow-agro-500/30">
+        <i data-lucide="leaf" class="w-5 h-5 text-white"></i>
+      </div>
+      <div>
+        <div class="font-bold text-sm tracking-tight">AgroClimate <span class="text-agro-500">ID</span></div>
+        <div class="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400">Digital Monitoring Card</div>
+      </div>
+    </div>
+
+    <nav class="hidden lg:flex items-center gap-1 text-sm font-medium">
+      <a href="#hero" class="px-3 py-2 rounded-lg hover:bg-agro-50 dark:hover:bg-slate-800 transition">Beranda</a>
+      <a href="#kpi" class="px-3 py-2 rounded-lg hover:bg-agro-50 dark:hover:bg-slate-800 transition">KPI</a>
+      <a href="#cards" class="px-3 py-2 rounded-lg hover:bg-agro-50 dark:hover:bg-slate-800 transition">Monitoring</a>
+      <a href="#map" class="px-3 py-2 rounded-lg hover:bg-agro-50 dark:hover:bg-slate-800 transition">Peta</a>
+      <a href="#analytics" class="px-3 py-2 rounded-lg hover:bg-agro-50 dark:hover:bg-slate-800 transition">Analitik</a>
+      <a href="#table" class="px-3 py-2 rounded-lg hover:bg-agro-50 dark:hover:bg-slate-800 transition">Data</a>
+    </nav>
+
+    <div class="flex items-center gap-2">
+      <div id="climate-ticker" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/70 dark:bg-slate-800/60 border border-white/50 dark:border-slate-700/50 text-xs font-medium">
+        <span class="w-2 h-2 rounded-full bg-agro-500 pulse-dot"></span>
+        <span id="ticker-text" class="text-slate-600 dark:text-slate-300">Memuat data…</span>
+      </div>
+      <button id="theme-toggle" class="w-10 h-10 rounded-xl flex items-center justify-center bg-white/70 dark:bg-slate-800/60 border border-white/50 dark:border-slate-700/50 hover:scale-105 transition">
+        <i data-lucide="moon" class="w-4 h-4 hidden dark:block"></i>
+        <i data-lucide="sun" class="w-4 h-4 block dark:hidden"></i>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<section id="hero" class="relative pt-10 lg:pt-16 pb-8 px-4 lg:px-8">
+  <div class="max-w-[1500px] mx-auto">
+    <div class="grid lg:grid-cols-12 gap-6 items-center">
+      <div class="lg:col-span-7 space-y-5">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/70 dark:bg-slate-800/60 border border-white/50 dark:border-slate-700/50 text-xs font-semibold text-agro-700 dark:text-agro-300 backdrop-blur">
+          <span class="w-1.5 h-1.5 rounded-full bg-agro-500 animate-ping"></span>
+          Realtime Climate Intelligence • Indonesia
+        </div>
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.05] tracking-tight">
+          <span class="bg-gradient-to-br from-agro-600 via-climate-600 to-agro-500 bg-clip-text text-transparent">Digital Monitoring Card</span><br />
+          Agroklimatologi
+        </h1>
+        <p class="text-base md:text-lg text-slate-600 dark:text-slate-300 max-w-2xl">
+          Monitoring Iklim, ENSO, GDD dan Serangan OPT Perkebunan Indonesia — Kakao, Kelapa, dan Cengkeh — dalam satu dashboard intelijen iklim.
+        </p>
+        <div class="flex flex-wrap items-center gap-3 pt-1">
+          <a href="#filter" class="px-5 py-3 rounded-xl bg-gradient-to-r from-agro-500 to-climate-500 text-white font-semibold shadow-lg shadow-agro-500/30 hover:shadow-xl hover:-translate-y-0.5 transition">Mulai Monitoring</a>
+          <label for="file-upload" class="cursor-pointer px-5 py-3 rounded-xl bg-white/70 dark:bg-slate-800/60 border border-white/50 dark:border-slate-700/50 font-semibold hover:scale-[1.02] transition flex items-center gap-2">
+            <i data-lucide="upload-cloud" class="w-4 h-4"></i> Unggah Dataset .xlsx
+          </label>
+          <input id="file-upload" type="file" accept=".xlsx,.xls,.csv" multiple class="hidden" />
+        </div>
+
+        <!-- floating mini badges -->
+        <div class="flex flex-wrap gap-2 pt-2">
+          <span class="chip"><i data-lucide="thermometer" class="w-3.5 h-3.5"></i> TMAX • TMIN • TAVG</span>
+          <span class="chip"><i data-lucide="cloud-rain" class="w-3.5 h-3.5"></i> Curah Hujan</span>
+          <span class="chip"><i data-lucide="droplets" class="w-3.5 h-3.5"></i> RH</span>
+          <span class="chip"><i data-lucide="wind" class="w-3.5 h-3.5"></i> WDSP</span>
+          <span class="chip"><i data-lucide="activity" class="w-3.5 h-3.5"></i> GDD • AGDD</span>
+          <span class="chip"><i data-lucide="bug" class="w-3.5 h-3.5"></i> OPT Perkebunan</span>
+        </div>
+      </div>
+
+      <!-- floating glass weather + ENSO card -->
+      <div class="lg:col-span-5">
+        <div class="glass-card p-6 lg:p-7 relative overflow-hidden">
+          <div class="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-climate-400/30 blur-3xl"></div>
+          <div class="absolute -bottom-20 -left-10 w-56 h-56 rounded-full bg-agro-400/30 blur-3xl"></div>
+
+          <div class="flex items-start justify-between relative">
+            <div>
+              <div class="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400">Status Iklim Harian</div>
+              <div class="text-2xl font-bold mt-1" id="hero-region">Indonesia</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400" id="hero-date">—</div>
+            </div>
+            <div class="weather-widget">
+              <div class="sun"></div>
+              <div class="cloud"></div>
+              <div class="cloud cloud-2"></div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3 mt-6 relative">
+            <div class="mini-stat">
+              <div class="label">TAVG</div>
+              <div class="value" id="hero-tavg">—</div>
+              <div class="unit">°C</div>
+            </div>
+            <div class="mini-stat">
+              <div class="label">RH</div>
+              <div class="value" id="hero-rh">—</div>
+              <div class="unit">%</div>
+            </div>
+            <div class="mini-stat">
+              <div class="label">PRCP</div>
+              <div class="value" id="hero-prcp">—</div>
+              <div class="unit">mm</div>
+            </div>
+          </div>
+
+          <!-- ENSO gauge -->
+          <div class="mt-6 p-4 rounded-2xl bg-white/60 dark:bg-slate-800/60 border border-white/40 dark:border-slate-700/40 relative">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400">ENSO Phase</div>
+                <div class="flex items-center gap-2 mt-1">
+                  <span id="enso-badge" class="enso-badge enso-neutral">Netral</span>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">Anomaly <span id="enso-value" class="font-semibold">0.00</span></span>
+                </div>
+              </div>
+              <div class="enso-pulse"><span></span><span></span><span></span></div>
+            </div>
+            <div class="enso-gauge mt-3">
+              <div class="enso-gauge-fill" id="enso-gauge-fill"></div>
+              <div class="enso-gauge-marker" id="enso-gauge-marker"></div>
+              <div class="enso-gauge-labels"><span>La Niña</span><span>Netral</span><span>El Niño</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FILTER PANEL -->
+<section id="filter" class="sticky top-16 z-30 px-4 lg:px-8 py-3">
+  <div class="max-w-[1500px] mx-auto">
+    <div class="glass-card p-4 lg:p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="sliders-horizontal" class="w-4 h-4 text-agro-500"></i>
+          <h3 class="font-semibold text-sm">Filter & Eksplorasi Data</h3>
+        </div>
+        <div class="text-[11px] text-slate-500 dark:text-slate-400" id="filter-summary">— record</div>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+        <div class="filter-group"><label>Provinsi</label><select id="f-provinsi"><option value="">Semua</option></select></div>
+        <div class="filter-group"><label>Kab / Kota</label><select id="f-kab"><option value="">Semua</option></select></div>
+        <div class="filter-group"><label>Tahun</label><select id="f-tahun"><option value="">Semua</option></select></div>
+        <div class="filter-group"><label>Bulan</label><select id="f-bulan"><option value="">Semua</option></select></div>
+        <div class="filter-group"><label>Komoditas</label><select id="f-komoditas"><option value="">Semua</option></select></div>
+        <div class="filter-group"><label>OPT</label><select id="f-opt"><option value="">Semua</option></select></div>
+        <div class="filter-group"><label>ENSO Phase</label><select id="f-enso"><option value="">Semua</option><option>El Niño</option><option>La Niña</option><option>Netral</option></select></div>
+        <div class="filter-group"><label>Tanggal Mulai</label><input id="f-date-start" type="date" /></div>
+        <div class="filter-group"><label>Tanggal Akhir</label><input id="f-date-end" type="date" /></div>
+        <div class="filter-group"><label>Threshold GDD: <span id="f-gdd-val" class="font-semibold text-agro-600">0</span></label><input id="f-gdd" type="range" min="0" max="1200" step="50" value="0" class="w-full accent-agro-500" /></div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 mt-3">
+        <button id="btn-apply" class="btn-primary"><i data-lucide="zap" class="w-3.5 h-3.5"></i> Terapkan Filter</button>
+        <button id="btn-reset" class="btn-ghost"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset</button>
+        <span class="flex-1"></span>
+        <button id="btn-png" class="btn-ghost"><i data-lucide="image" class="w-3.5 h-3.5"></i> Export PNG</button>
+        <button id="btn-pdf" class="btn-ghost"><i data-lucide="file-text" class="w-3.5 h-3.5"></i> Export PDF</button>
+        <button id="btn-xlsx" class="btn-ghost"><i data-lucide="sheet" class="w-3.5 h-3.5"></i> Export Excel</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- KPI -->
+<section id="kpi" class="px-4 lg:px-8 py-6">
+  <div class="max-w-[1500px] mx-auto">
+    <div class="flex items-end justify-between mb-3">
+      <div>
+        <h2 class="text-xl font-bold">Indikator Kunci</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Ringkasan analitik berdasarkan filter aktif</p>
+      </div>
+    </div>
+    <div id="kpi-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-3"></div>
+  </div>
+</section>
+
+<!-- DIGITAL MONITORING CARDS -->
+<section id="cards" class="px-4 lg:px-8 py-6">
+  <div class="max-w-[1500px] mx-auto">
+    <div class="flex items-end justify-between mb-3">
+      <div>
+        <h2 class="text-xl font-bold">Digital Monitoring Card</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Komoditas × OPT dengan status risiko dan rekomendasi AI</p>
+      </div>
+    </div>
+    <div id="mon-cards" class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+  </div>
+</section>
+
+<!-- MAP + INSIGHT -->
+<section id="map" class="px-4 lg:px-8 py-6">
+  <div class="max-w-[1500px] mx-auto grid lg:grid-cols-3 gap-4">
+    <div class="lg:col-span-2 glass-card p-4 lg:p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="text-lg font-bold flex items-center gap-2"><i data-lucide="map" class="w-4 h-4 text-climate-500"></i> Peta Risiko OPT</h2>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400">Heatmap intensitas + marker per Kab / kota</p>
+        </div>
+        <div class="flex items-center gap-2 text-[11px]">
+          <span class="legend-dot bg-emerald-500"></span> Aman
+          <span class="legend-dot bg-amber-500"></span> Waspada
+          <span class="legend-dot bg-rose-500"></span> Bahaya
+        </div>
+      </div>
+      <div id="map-canvas" class="rounded-2xl overflow-hidden h-[460px] border border-white/40 dark:border-slate-700/40"></div>
+    </div>
+
+    <div class="glass-card p-4 lg:p-5 space-y-4 relative overflow-hidden">
+      <h2 class="text-lg font-bold flex items-center gap-2"><i data-lucide="sparkles" class="w-4 h-4 text-agro-500"></i> AI Insight</h2>
+      <div id="ai-insights" class="space-y-2 max-h-[420px] overflow-y-auto pr-1"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ANALYTICS -->
+<section id="analytics" class="px-4 lg:px-8 py-6">
+  <div class="max-w-[1500px] mx-auto space-y-4">
+    <div class="flex items-end justify-between">
+      <div>
+        <h2 class="text-xl font-bold">Analitik Iklim & OPT</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Visualisasi multi-dimensi untuk pengambilan keputusan</p>
+      </div>
+    </div>
+
+    <div class="relative">
+      <button id="carousel-prev" class="carousel-nav left-1" aria-label="prev"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+      <button id="carousel-next" class="carousel-nav right-1" aria-label="next"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+      <div id="chart-carousel" class="chart-carousel">
+        <div class="chart-card"><div class="chart-head"><h3>Time Series Iklim</h3><span class="badge-soft">TAVG • RH • PRCP</span></div><canvas id="chart-timeseries"></canvas></div>
+        <div class="chart-card"><div class="chart-head"><h3>Multi-Axis Climate</h3><span class="badge-soft">Suhu vs PRCP vs GDD</span></div><canvas id="chart-multiaxis"></canvas></div>
+        <div class="chart-card"><div class="chart-head"><h3>Curah Hujan vs OPT</h3><span class="badge-soft">korelasi</span></div><canvas id="chart-prcp-opt"></canvas></div>
+        <div class="chart-card"><div class="chart-head"><h3>GDD vs OPT</h3><span class="badge-soft">korelasi</span></div><canvas id="chart-gdd-opt"></canvas></div>
+        <div class="chart-card"><div class="chart-head"><h3>ENSO vs Curah Hujan</h3><span class="badge-soft">overlay</span></div><canvas id="chart-enso-prcp"></canvas></div>
+        <div class="chart-card"><div class="chart-head"><h3>RH vs OPT</h3><span class="badge-soft">korelasi</span></div><canvas id="chart-rh-opt"></canvas></div>
+        <div class="chart-card"><div class="chart-head"><h3>Scatter: GDD vs Intensitas OPT</h3><span class="badge-soft">scatter</span></div><canvas id="chart-scatter-gdd"></canvas></div>
+        <div class="chart-card"><div class="chart-head"><h3>Scatter: RH vs Kasus OPT</h3><span class="badge-soft">scatter</span></div><canvas id="chart-scatter-rh"></canvas></div>
+        <div class="chart-card"><div class="chart-head"><h3>Heatmap Bulan vs OPT</h3><span class="badge-soft">matrix</span></div><canvas id="chart-heatmap"></canvas></div>
+        <div class="chart-card"><div class="chart-head"><h3>Polar Wind Analysis</h3><span class="badge-soft">WDSP</span></div><canvas id="chart-wind"></canvas></div>
+        <div class="chart-card"><div class="chart-head"><h3>Ranking Provinsi (Risiko)</h3><span class="badge-soft">top</span></div><canvas id="chart-rank-prov"></canvas></div>
+        <div class="chart-card"><div class="chart-head"><h3>Ranking Kab / Kota (Risiko)</h3><span class="badge-soft">top</span></div><canvas id="chart-rank-kab"></canvas></div>
+        <div class="chart-card csi-card">
+          <div class="chart-head">
+            <h3>Climate Suitability Index per Komoditas</h3>
+            <span class="badge-soft">Suhu • RH • PRCP • Angin • GDD</span>
+          </div>
+          <canvas id="chart-csi"></canvas>
+        </div>
+      </div>
+      <div class="flex items-center justify-center gap-1 mt-3" id="carousel-dots"></div>
+    </div>
+  </div>
+</section>
+
+<!-- DATA TABLE -->
+<section id="table" class="px-4 lg:px-8 py-6">
+  <div class="max-w-[1500px] mx-auto">
+    <div class="glass-card p-4 lg:p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="text-lg font-bold flex items-center gap-2"><i data-lucide="database" class="w-4 h-4 text-agro-500"></i> Tabel Data Gabungan</h2>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400">Iklim + ENSO + GDD + OPT</p>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table id="data-table" class="display compact w-full text-xs"></table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="px-4 lg:px-8 py-10 text-center text-xs text-slate-500 dark:text-slate-400">
+  <div class="max-w-[1500px] mx-auto border-t border-slate-200 dark:border-slate-800 pt-6">
+    <div class="font-semibold text-slate-700 dark:text-slate-200">AgroClimate ID • Digital Monitoring Card</div>
+    <div class="mt-1">Climate Intelligence Dashboard untuk Perkebunan Kakao, Kelapa & Cengkeh</div>
+  </div>
+</footer>
+
+<!-- Loading overlay -->
+<div id="loader" class="fixed inset-0 z-[100] flex items-center justify-center bg-white/70 dark:bg-slate-900/70 backdrop-blur-md">
+  <div class="text-center">
+    <div class="loader-ring"><div></div><div></div><div></div><div></div></div>
+    <div class="mt-4 font-semibold text-sm bg-gradient-to-r from-agro-600 to-climate-600 bg-clip-text text-transparent">Memuat Climate Intelligence…</div>
+    <div class="text-[11px] text-slate-500 mt-1" id="loader-status">menyiapkan dataset</div>
+  </div>
+</div>
+
+<!-- JS modules -->
+<script src="js/data.js"></script>
+<script src="js/filters.js"></script>
+<script src="js/kpi.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/map.js"></script>
+<script src="js/insights.js"></script>
+<script src="js/export.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
